@@ -6,9 +6,13 @@
     <title>비밀의 상자 - 누구의 마음일까?</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-indigo-950 min-h-screen flex items-center justify-center p-4">
+<body class="bg-indigo-950 min-h-screen flex flex-col items-center justify-start p-4 relative">
 
-    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden mb-10 mt-5">
+    <button onclick="promptReset()" class="fixed bottom-6 right-6 bg-red-600 border-2 border-white text-white text-sm font-bold py-3 px-5 rounded-full shadow-[0_10px_25px_rgba(220,38,38,0.6)] z-50 active:scale-90 transition-transform flex items-center gap-2">
+        ⚙️ 초기화
+    </button>
+
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden mb-10 mt-2">
         <div class="bg-gradient-to-r from-purple-700 to-indigo-800 p-8 text-white text-center">
             <h1 class="text-3xl font-black tracking-widest">Secret Box</h1>
             <p class="text-purple-200 text-xs mt-2 uppercase tracking-tighter">오직 힌트로만 주인을 찾아보세요!</p>
@@ -36,6 +40,11 @@
                         <label class="block text-xs font-bold text-indigo-900 ml-1 mb-1">나의 관심사</label>
                         <input type="text" id="interest" class="w-full p-3 bg-indigo-50 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none border-none" placeholder="요즘 꽂힌 것">
                     </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-indigo-900 ml-1 mb-1">간단한 자기소개 (선택)</label>
+                    <textarea id="intro" rows="2" class="w-full p-3 bg-indigo-50 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none border-none" placeholder="나를 표현할 수 있는 한마디!"></textarea>
                 </div>
 
                 <div>
@@ -69,7 +78,7 @@
     </div>
 
     <script>
-        let gameState = 'idle'; // idle, red, green, penalty, done
+        let gameState = 'idle'; 
         let timeoutId = null;
         let gameStartTime = 0;
         
@@ -84,7 +93,6 @@
             const gameMsg = document.getElementById('gameMsg');
 
             if (gameState === 'idle' || gameState === 'done') {
-                // 게임 완전 초기화 및 시작
                 currentRound = 0;
                 totalTimeMs = 0;
                 penaltyTimeMs = 0;
@@ -93,36 +101,28 @@
                 startNextRound();
 
             } else if (gameState === 'red') {
-                // 반칙: 초록색이 아닐 때 터치함
                 clearTimeout(timeoutId);
                 gameState = 'penalty';
-                penaltyTimeMs += 2000; // 2초 페널티 누적
+                penaltyTimeMs += 2000; 
                 
                 box.className = "w-full h-24 bg-yellow-400 rounded-xl flex items-center justify-center font-bold text-yellow-900 cursor-pointer select-none shadow-inner active:scale-95 duration-100";
                 box.innerText = "앗! 너무 빨라요 (페널티 +2초)";
-                
                 gameMsg.classList.remove('hidden');
                 
-                // 1.5초 후 해당 라운드 다시 시작
                 setTimeout(() => {
                     if(gameState === 'penalty') startNextRound();
                 }, 1500);
 
             } else if (gameState === 'green') {
-                // 정상 터치 성공
                 const reactionTime = Date.now() - gameStartTime;
                 totalTimeMs += reactionTime;
                 currentRound++;
 
                 if (currentRound < maxRounds) {
-                    // 다음 라운드 진행
                     startNextRound();
                 } else {
-                    // 5라운드 모두 종료
                     gameState = 'done';
-                    // 평균 기록 계산 (전체 시간 + 페널티 시간을 5로 나눔)
                     const finalAverage = ((totalTimeMs + penaltyTimeMs) / 1000 / maxRounds).toFixed(3);
-                    
                     box.className = "w-full h-24 bg-blue-500 rounded-xl flex items-center justify-center font-bold text-white cursor-pointer select-none shadow-inner active:scale-95 duration-100";
                     box.innerHTML = `테스트 완료!<br>최종 평균: ${finalAverage}초`;
                     scoreInput.value = finalAverage;
@@ -133,13 +133,10 @@
         function startNextRound() {
             gameState = 'red';
             const box = document.getElementById('gameBox');
-            
             box.className = "w-full h-24 bg-red-500 rounded-xl flex flex-col items-center justify-center font-bold text-white cursor-pointer select-none shadow-inner active:scale-95 duration-100";
             box.innerHTML = `[ ${currentRound + 1} / ${maxRounds} 라운드 ]<br><span class="text-sm font-normal opacity-80">초록색으로 바뀌면 터치하세요</span>`;
             
-            // 1.5초 ~ 3.5초 사이의 랜덤 딜레이
             const randomDelay = Math.floor(Math.random() * 2000) + 1500;
-            
             timeoutId = setTimeout(() => {
                 if(gameState === 'red') {
                     gameState = 'green';
@@ -154,7 +151,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAasIYMFoI6bGKxtIkLrsezM3_hTcu-qTc",
@@ -189,6 +186,7 @@
         window.saveToBox = async () => {
             const hobby = document.getElementById('hobby').value;
             const interest = document.getElementById('interest').value;
+            const intro = document.getElementById('intro').value;
             const verse = document.getElementById('verse').value;
             const reason = document.getElementById('reason').value;
             const reactionScore = document.getElementById('reactionScore').value; 
@@ -202,13 +200,13 @@
                 await addDoc(dbCollection, { 
                     deviceId: myDeviceId, 
                     hobby, 
-                    interest, 
+                    interest,
+                    intro,
                     verse, 
                     reason,
                     reactionScore 
                 });
                 
-                // 폼 초기화 (게임 박스 포함)
                 document.querySelectorAll('input[type="text"], textarea, input[type="hidden"]').forEach(el => el.value = '');
                 const gameBox = document.getElementById('gameBox');
                 gameBox.className = "w-full h-24 bg-slate-200 rounded-xl flex items-center justify-center font-bold text-slate-500 cursor-pointer select-none transition-colors shadow-inner active:scale-95 duration-100 text-center px-4";
@@ -218,7 +216,7 @@
                 
                 alert("상자에 익명으로 쏙! 들어갔습니다.");
             } catch (error) {
-                alert("오류가 발생했습니다.");
+                alert("에러 발생: " + error.message);
             } finally {
                 btn.innerText = "비밀 상자에 넣기"; btn.disabled = false;
             }
@@ -245,6 +243,7 @@
 
             box.forEach((person, i) => {
                 const received = shuffled[i];
+                const introHtml = received.intro ? `<div class="mt-3 p-2 bg-indigo-100 rounded-lg text-xs text-indigo-800 italic">" ${received.intro} "</div>` : '';
                 const scoreText = received.reactionScore ? `평균 ${received.reactionScore}초` : '안함 🤷‍♂️';
 
                 resultList.innerHTML += `
@@ -254,6 +253,8 @@
                         <div class="text-indigo-900 font-bold text-lg mb-2 leading-tight">"${received.verse}"</div>
                         <div class="text-slate-600 text-sm mb-2 leading-relaxed font-medium">"${received.reason}"</div>
                         
+                        ${introHtml}
+
                         <div class="flex flex-wrap gap-2 mt-4 font-bold">
                             <span class="text-[10px] bg-white px-2 py-1 rounded-full border border-indigo-200">#취미: ${received.hobby || '비밀'}</span>
                             <span class="text-[10px] bg-white px-2 py-1 rounded-full border border-indigo-200">#관심: ${received.interest || '비밀'}</span>
@@ -262,6 +263,32 @@
                     </div>
                 `;
             });
+        };
+
+        window.promptReset = async () => {
+            const pwd = prompt("상자를 초기화하려면 관리자 암호를 입력하세요:");
+            
+            if (pwd === "3950") {
+                if (confirm("정말 상자를 싹 비우시겠습니까? (이 작업은 되돌릴 수 없습니다!)")) {
+                    try {
+                        const querySnapshot = await getDocs(dbCollection);
+                        const deletePromises = [];
+                        
+                        querySnapshot.forEach((documentSnapshot) => {
+                            deletePromises.push(deleteDoc(doc(db, "secretBox", documentSnapshot.id)));
+                        });
+                        
+                        await Promise.all(deletePromises);
+                        
+                        alert("상자가 깨끗하게 초기화되었습니다!");
+                        document.getElementById('result-list').innerHTML = ""; 
+                    } catch (error) {
+                        alert("초기화 중 오류가 발생했습니다: " + error.message);
+                    }
+                }
+            } else if (pwd !== null) {
+                alert("암호가 틀렸습니다. 관리자만 초기화할 수 있습니다.");
+            }
         };
     </script>
 </body>
