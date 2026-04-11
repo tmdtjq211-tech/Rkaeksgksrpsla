@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>비밀의 상자 - 누구의 마음일까?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-indigo-950 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden mb-10 mt-5">
+        <div class="bg-gradient-to-r from-purple-700 to-indigo-800 p-8 text-white text-center">
+            <h1 class="text-3xl font-black tracking-widest">Secret Box</h1>
+            <p class="text-purple-200 text-xs mt-2 uppercase tracking-tighter">오직 힌트로만 주인을 찾아보세요!</p>
+        </div>
+
+        <div class="p-6 space-y-5">
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div class="flex justify-between items-end mb-2">
+                    <label class="block text-xs font-bold text-indigo-900 ml-1">⚡ 순발력 테스트 (총 5회)</label>
+                    <span id="gameMsg" class="text-[10px] text-red-500 font-bold hidden">페널티 +2초 누적!</span>
+                </div>
+                <div id="gameBox" onclick="handleGameTap()" class="w-full h-24 bg-slate-200 rounded-xl flex items-center justify-center font-bold text-slate-500 cursor-pointer select-none transition-colors shadow-inner active:scale-95 duration-100 text-center px-4">
+                    여기를 터치하여 5연속 테스트 시작
+                </div>
+                <input type="hidden" id="reactionScore" value="">
+            </div>
+
+            <div id="input-form" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-indigo-900 ml-1 mb-1">나의 취미</label>
+                        <input type="text" id="hobby" class="w-full p-3 bg-indigo-50 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none border-none" placeholder="결정적 힌트!">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-indigo-900 ml-1 mb-1">나의 관심사</label>
+                        <input type="text" id="interest" class="w-full p-3 bg-indigo-50 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none border-none" placeholder="요즘 꽂힌 것">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-indigo-900 ml-1 mb-1">나누고 싶은 성경 구절</label>
+                    <textarea id="verse" rows="2" class="w-full p-3 bg-indigo-50 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none border-none" placeholder="구절을 입력하세요"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-indigo-900 ml-1 mb-1">좋아하는 이유</label>
+                    <textarea id="reason" rows="2" class="w-full p-3 bg-indigo-50 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none border-none" placeholder="이유가 곧 가장 큰 힌트가 됩니다!"></textarea>
+                </div>
+
+                <button onclick="saveToBox()" id="submitBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all active:scale-95 duration-200">
+                    비밀 상자에 넣기
+                </button>
+            </div>
+
+            <div class="flex justify-between items-center px-2 py-3 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                <span class="text-slate-500 text-sm font-bold italic">현재 쌓인 마음: <span id="count" class="text-purple-600 font-black text-lg">0</span>개</span>
+                <label class="text-[11px] text-slate-400 flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" id="preventSelf" checked> 내 껀 안 받기
+                </label>
+            </div>
+
+            <button onclick="startMatching()" class="w-full bg-indigo-900 text-white font-bold py-3 rounded-xl hover:bg-black transition shadow-md">
+                상자 열어보기 🎁
+            </button>
+
+            <div id="result-list" class="space-y-4 mt-6"></div>
+        </div>
+    </div>
+
+    <script>
+        let gameState = 'idle'; // idle, red, green, penalty, done
+        let timeoutId = null;
+        let gameStartTime = 0;
+        
+        let currentRound = 0;
+        const maxRounds = 5;
+        let totalTimeMs = 0;
+        let penaltyTimeMs = 0;
+
+        function handleGameTap() {
+            const box = document.getElementById('gameBox');
+            const scoreInput = document.getElementById('reactionScore');
+            const gameMsg = document.getElementById('gameMsg');
+
+            if (gameState === 'idle' || gameState === 'done') {
+                // 게임 완전 초기화 및 시작
+                currentRound = 0;
+                totalTimeMs = 0;
+                penaltyTimeMs = 0;
+                scoreInput.value = "";
+                gameMsg.classList.add('hidden');
+                startNextRound();
+
+            } else if (gameState === 'red') {
+                // 반칙: 초록색이 아닐 때 터치함
+                clearTimeout(timeoutId);
+                gameState = 'penalty';
+                penaltyTimeMs += 2000; // 2초 페널티 누적
+                
+                box.className = "w-full h-24 bg-yellow-400 rounded-xl flex items-center justify-center font-bold text-yellow-900 cursor-pointer select-none shadow-inner active:scale-95 duration-100";
+                box.innerText = "앗! 너무 빨라요 (페널티 +2초)";
+                
+                gameMsg.classList.remove('hidden');
+                
+                // 1.5초 후 해당 라운드 다시 시작
+                setTimeout(() => {
+                    if(gameState === 'penalty') startNextRound();
+                }, 1500);
+
+            } else if (gameState === 'green') {
+                // 정상 터치 성공
+                const reactionTime = Date.now() - gameStartTime;
+                totalTimeMs += reactionTime;
+                currentRound++;
+
+                if (currentRound < maxRounds) {
+                    // 다음 라운드 진행
+                    startNextRound();
+                } else {
+                    // 5라운드 모두 종료
+                    gameState = 'done';
+                    // 평균 기록 계산 (전체 시간 + 페널티 시간을 5로 나눔)
+                    const finalAverage = ((totalTimeMs + penaltyTimeMs) / 1000 / maxRounds).toFixed(3);
+                    
+                    box.className = "w-full h-24 bg-blue-500 rounded-xl flex items-center justify-center font-bold text-white cursor-pointer select-none shadow-inner active:scale-95 duration-100";
+                    box.innerHTML = `테스트 완료!<br>최종 평균: ${finalAverage}초`;
+                    scoreInput.value = finalAverage;
+                }
+            }
+        }
+
+        function startNextRound() {
+            gameState = 'red';
+            const box = document.getElementById('gameBox');
+            
+            box.className = "w-full h-24 bg-red-500 rounded-xl flex flex-col items-center justify-center font-bold text-white cursor-pointer select-none shadow-inner active:scale-95 duration-100";
+            box.innerHTML = `[ ${currentRound + 1} / ${maxRounds} 라운드 ]<br><span class="text-sm font-normal opacity-80">초록색으로 바뀌면 터치하세요</span>`;
+            
+            // 1.5초 ~ 3.5초 사이의 랜덤 딜레이
+            const randomDelay = Math.floor(Math.random() * 2000) + 1500;
+            
+            timeoutId = setTimeout(() => {
+                if(gameState === 'red') {
+                    gameState = 'green';
+                    box.className = "w-full h-24 bg-green-500 rounded-xl flex items-center justify-center font-black text-3xl text-white cursor-pointer select-none shadow-lg active:scale-95 duration-100";
+                    box.innerText = "지금 터치!!!";
+                    gameStartTime = Date.now();
+                }
+            }, randomDelay);
+        }
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAasIYMFoI6bGKxtIkLrsezM3_hTcu-qTc",
+            authDomain: "gamee-da82e.firebaseapp.com",
+            projectId: "gamee-da82e",
+            storageBucket: "gamee-da82e.firebasestorage.app",
+            messagingSenderId: "595318343509",
+            appId: "1:595318343509:web:029ab9ad5ea658326791dc",
+            measurementId: "G-8XH7K7XV3V"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let box = []; 
+        let myDeviceId = localStorage.getItem('grace_device_id');
+        if(!myDeviceId) {
+            myDeviceId = 'user_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('grace_device_id', myDeviceId);
+        }
+
+        signInAnonymously(auth).catch(error => console.error("로그인 실패:", error));
+
+        const dbCollection = collection(db, "secretBox");
+        onSnapshot(dbCollection, (snapshot) => {
+            box = [];
+            snapshot.forEach((doc) => box.push(doc.data()));
+            document.getElementById('count').innerText = box.length;
+        });
+
+        window.saveToBox = async () => {
+            const hobby = document.getElementById('hobby').value;
+            const interest = document.getElementById('interest').value;
+            const verse = document.getElementById('verse').value;
+            const reason = document.getElementById('reason').value;
+            const reactionScore = document.getElementById('reactionScore').value; 
+
+            if (!verse || !reason) return alert("구절과 이유는 꼭 적어주세요!");
+
+            const btn = document.getElementById('submitBtn');
+            btn.innerText = "저장 중..."; btn.disabled = true;
+
+            try {
+                await addDoc(dbCollection, { 
+                    deviceId: myDeviceId, 
+                    hobby, 
+                    interest, 
+                    verse, 
+                    reason,
+                    reactionScore 
+                });
+                
+                // 폼 초기화 (게임 박스 포함)
+                document.querySelectorAll('input[type="text"], textarea, input[type="hidden"]').forEach(el => el.value = '');
+                const gameBox = document.getElementById('gameBox');
+                gameBox.className = "w-full h-24 bg-slate-200 rounded-xl flex items-center justify-center font-bold text-slate-500 cursor-pointer select-none transition-colors shadow-inner active:scale-95 duration-100 text-center px-4";
+                gameBox.innerText = "여기를 터치하여 5연속 테스트 시작";
+                document.getElementById('gameMsg').classList.add('hidden');
+                gameState = 'idle';
+                
+                alert("상자에 익명으로 쏙! 들어갔습니다.");
+            } catch (error) {
+                alert("오류가 발생했습니다.");
+            } finally {
+                btn.innerText = "비밀 상자에 넣기"; btn.disabled = false;
+            }
+        };
+
+        window.startMatching = () => {
+            if (box.length < 2) return alert("최소 2명 이상 참여해야 합니다!");
+            
+            const preventSelf = document.getElementById('preventSelf').checked;
+            let shuffled;
+            
+            let attempts = 0;
+            while(true) {
+                shuffled = [...box].sort(() => Math.random() - 0.5);
+                if (preventSelf && shuffled.some((item, i) => item.deviceId === box[i].deviceId)) {
+                    attempts++;
+                    if(attempts < 100) continue;
+                }
+                break;
+            }
+
+            const resultList = document.getElementById('result-list');
+            resultList.innerHTML = "<h3 class='font-black text-center text-indigo-900 text-xl py-4 italic underline decoration-purple-500'>- 도착한 구절들 -</h3>";
+
+            box.forEach((person, i) => {
+                const received = shuffled[i];
+                const scoreText = received.reactionScore ? `평균 ${received.reactionScore}초` : '안함 🤷‍♂️';
+
+                resultList.innerHTML += `
+                    <div class="relative p-5 bg-gradient-to-br from-white to-indigo-50 border border-indigo-100 rounded-3xl shadow-md overflow-hidden">
+                        <div class="text-xs font-black text-purple-600 mb-3 tracking-widest uppercase">🎁 비밀의 상자 #${i + 1}</div>
+                        
+                        <div class="text-indigo-900 font-bold text-lg mb-2 leading-tight">"${received.verse}"</div>
+                        <div class="text-slate-600 text-sm mb-2 leading-relaxed font-medium">"${received.reason}"</div>
+                        
+                        <div class="flex flex-wrap gap-2 mt-4 font-bold">
+                            <span class="text-[10px] bg-white px-2 py-1 rounded-full border border-indigo-200">#취미: ${received.hobby || '비밀'}</span>
+                            <span class="text-[10px] bg-white px-2 py-1 rounded-full border border-indigo-200">#관심: ${received.interest || '비밀'}</span>
+                            <span class="text-[10px] bg-yellow-50 px-2 py-1 rounded-full border border-yellow-400 text-yellow-700">⚡순발력: ${scoreText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        };
+    </script>
+</body>
+</html>
